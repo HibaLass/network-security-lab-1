@@ -133,4 +133,65 @@ From a Security Operations Center (SOC) point of view:
 
 - Windows 7 → suspicious / high exposure endpoint
 - Windows 11 → secured and normal enterprise endpoint
+
+## 📡 Wireshark Packet Analysis
+
+### 🟢 1. SYN Packets (Scan Initiation)
+
+- Source: 192.168.10.30 (Kali Linux)
+- Destination: 192.168.10.21 (Windows 7)
+- Flags: SYN
+
+**Analysis:**
+Kali Linux sends SYN packets to multiple destination ports in order to initiate TCP connections.  
+This is the first step of an Nmap SYN scan used to discover open ports.
+
+---
+
+### 🟢 2. SYN-ACK Packets (Open Ports)
+
+- Source: 192.168.10.21 (Windows 7)
+- Destination: 192.168.10.30 (Kali Linux)
+- Flags: SYN, ACK
+- Example ports:
+  - 445 (SMB)
+  - 135 (RPC)
+
+**Analysis:**
+Windows 7 responds with SYN-ACK packets, indicating that the targeted ports are open and accepting connections.
+
+---
+
+### 🔴 3. RST Packets (Connection Termination)
+
+- Source: 192.168.10.30 (Kali Linux)
+- Destination: 192.168.10.21
+- Flags: RST
+
+**Analysis:**
+Kali Linux sends RST packets to terminate the connection after identifying the port state.  
+This behavior is typical of a SYN scan, which does not complete the full TCP handshake.
+
+---
+
+## 📌 TCP Behavior Summary
+
+- SYN → Sent by attacker (Kali) to probe ports  
+- SYN-ACK → Received from open ports (Windows 7)  
+- RST → Sent by Kali to terminate the connection  
+
+This confirms how Nmap performs a SYN scan without completing the full TCP handshake.
+
+---
+
+## 📊 System Comparison
+
+- Windows 7: Responds with SYN-ACK → Open ports detected  
+- Windows 11: No response → Ports are filtered (firewall active)
+
+---
+
+## 📌 Key Takeaway
+
+This analysis demonstrates how network scanners like Nmap rely on TCP handshake behavior to determine port states (open, closed, filtered).
 This lab helped understand how attackers discover systems, services, and potential attack surfaces using Nmap.
