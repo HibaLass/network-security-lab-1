@@ -1,1 +1,272 @@
+🟢 🎯 Objective
+Discover:
+Shared folders
+Users / system info
+Potential weaknesses via SMB (port 445)
+
+🧰 Tools we’ll use in Kali Linux
+Nmap (NSE scripts)
+smbclient (built-in)
+enum4linux 
+
+🔍 STEP 1 — SMB basic scan
+Run:
+nmap -p 445 --script smb-protocols 192.168.10.21
+Result
+NT LM 0.12 (SMBv1) [dangerous, but default]
+2:0:2
+2:1:0
+What this means
+🔴 1. SMBv1 is ENABLED (CRITICAL)
+
+This is very important:
+
+SMBv1 is deprecated
+Known to be insecure
+Used in major attacks (e.g., ransomware outbreaks)
+⚠️ Why SMBv1 is dangerous
+No strong encryption
+Vulnerable to multiple exploits
+Easily abused for lateral movement
+
+👉 In real environments:
+
+SMBv1 should be disabled
+
+🟢 2. SMBv2 is also supported
+2:0:2
+2:1:0
+
+👉 This is good, BUT:
+
+❌ SMBv1 being enabled still makes the system vulnerable
+
+Risk Assessment
+- SMBv1 enabled → 🔴 Critical risk
+- Exposed SMB service → 🔴 High risk
+
+### Conclusion
+The system is vulnerable due to the presence of SMBv1 and should be considered a high-risk target in a real-world environment.
+
+
+🔍 STEP 2 — SMB shares discovery
+Run:
+nmap -p 445 --script smb-enum-shares 192.168.10.21
+### Scan Result
+Attempted to enumerate SMB shares using Nmap NSE script.
+
+### Findings
+- Administrative shares detected:
+  - ADMIN$
+  - C$
+  - D$
+- Access to these shares is restricted (NT_STATUS_ACCESS_DENIED)
+
+### IPC$ Share
+- IPC$ share is accessible with anonymous READ access
+What is IPC$?
+“Inter-Process Communication”
+Used for:
+authentication
+remote procedure calls
+enumeration
+🚨 Security Meaning
+⚠️ Anonymous access = allowed
+
+Even if limited:
+
+👉 This means: 
+Attacker can interact without credentials
+🧠 Why this matters
+
+With IPC$ access, attacker may:
+
+Enumerate users
+Query system info
+Launch further SMB attacks
+
+👉 This is a classic entry point
+
+### Security Analysis
+- Restricted access to administrative shares is a good security measure
+- However, IPC$ allows anonymous interaction
+- This may enable further enumeration without authentication
+
+### Risk Assessment
+- SMB exposure → 🔴 High
+- SMBv1 enabled → 🔴 Critical
+- IPC$ anonymous access → 🟠 Medium risk
+
+### Conclusion
+While administrative shares are protected, the presence of anonymous access to IPC$ provides a potential entry point for further enumeration and attacks.
+
+
+🔍 STEP 3 — Users enumeration
+Run:
+nmap -p 445 --script smb-enum-users 192.168.10.21
+🧠 Goal:
+Discover usernames
+Useful for later attacks (brute force, etc.)
+Result
+(no users returned)
+🧠 What this means
+
+👉 The script did not return any usernames
+
+But this does NOT mean:
+
+No users exist ❌
+
+It means:
+
+Enumeration is restricted ✔
+🔍 Why did this happen?
+
+Most likely reasons:
+
+🔒 1. Anonymous enumeration is blocked
+
+Windows 7 is configured to:
+
+Prevent null session user listing
+Require authentication for user queries
+
+👉 This is a basic security control
+
+🔐 2. SMB still accessible but limited
+
+From previous step:
+
+IPC$ allowed ✅
+But user enumeration ❌
+
+👉 So access is:
+
+Partial (not fully open)
+
+⚖️ Security Interpretation
+Test	Result	Meaning
+SMB connection	✅ Works	Service exposed
+Share enumeration	⚠️ Limited	Some protection
+User enumeration	❌ Blocked	Better security
+At this stage:
+
+👉 I conclude:
+
+Target is not fully hardened
+But not completely open
+Requires deeper enumeration tools
+
+
+Time to go deeper and try with enum4linux 
+
+Why this matters?
+
+enum4linux is stronger than Nmap scripts:
+
+It may reveal:
+
+Hidden users
+Shares
+Password policy
+System info
+
+Run:
+enum4linux 192.168.10.21
+🔐 enum4linux Analysis (Windows 7)
+🟢 1. Workgroup & Host Info
+WORKGROUP
+VICTIM-WIN7-X64
+🧠 Meaning:
+The machine is part of a workgroup (not a domain)
+Hostname identified ✔
+
+👉 Useful for:
+
+Network mapping
+Target identification
+🟡 2. Null Session Allowed (IMPORTANT 🔥)
+Server allows sessions using username '', password ''
+
+👉 This is VERY IMPORTANT
+
+🧠 Meaning:
+Anonymous login (null session) is allowed
+No credentials required
+🚨 Security Impact
+
+This can allow:
+
+Information gathering
+SMB interaction without authentication
+Potential attack surface expansion
+
+👉 In real environments:
+
+This is considered a misconfiguration
+
+🔴 3. Access Denied on Most Enumeration
+
+You see many:
+
+NT_STATUS_ACCESS_DENIED
+🧠 Meaning:
+System is partially hardened
+Some protections are enabled
+
+
+
+⚖️ Interpretation
+FeatureStatusNull session✅ Allowed (weakness)User enumeration❌ BlockedShare enumeration⚠️ LimitedOS info❌ Restricted
+
+🧠 Pentester Thinking
+This is a classic scenario:
+👉 System is:
+
+
+Not fully open ❌
+
+
+Not fully secure ❌
+
+
+👉 This is what we call:
+
+“Partially hardened target”
+
+
+🔥 Most Important Finding
+👉 This line:
+Server allows sessions using username '', password ''
+✔ This is your key vulnerability
+
+🚨 Global Risk Assessment
+SMBv1 enabled🔴 Critical
+SMB exposed🔴 High
+Null session allowed 🔴 High
+Enumeration partially blocked🟡 Medium
+
+## 🔐 SMB Enumeration (enum4linux)
+
+### Key Findings
+
+- Target belongs to WORKGROUP
+- Hostname identified: VICTIM-WIN7-X64
+- SMB null session is allowed (anonymous login)
+
+### Security Analysis
+
+- The system allows anonymous SMB sessions without authentication
+- This is a misconfiguration that may allow attackers to gather information
+- Several enumeration attempts were blocked (NT_STATUS_ACCESS_DENIED), indicating partial security hardening
+
+### Risk Assessment
+
+- SMBv1 enabled → 🔴 Critical risk
+- SMB service exposed → 🔴 High risk
+- Null session allowed → 🔴 High risk
+
+### Conclusion
+
+The system is partially secured but still vulnerable due to the presence of SMBv1 and anonymous SMB access. These weaknesses could be leveraged for further enumeration or exploitation in a real-world scenario.
 
